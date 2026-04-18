@@ -7,7 +7,6 @@ import TaskTable from '@/components/TaskTable'
 import AddTaskModal from '@/components/AddTaskModal'
 import ZoneMapModal from '@/components/ZoneMapModal'
 import PumpControl from '@/components/PumpControl'
-import SensorCard from '@/components/SensorCard'
 import type { Zone, Task } from '@/types'
 
 export default function DashboardPage() {
@@ -20,8 +19,12 @@ export default function DashboardPage() {
   // Modal states
   const [showAddTask, setShowAddTask] = useState(false)
   const [showMap, setShowMap] = useState(false)
+  
+  // Pump state
+  const [pumpDeviceId, setPumpDeviceId] = useState<string | null>(null)
+  const [pumpLoading, setPumpLoading] = useState(false)
 
-  // ✅ ดึงโซนทั้งหมดเมื่อโหลดหน้า
+  // ✅ useEffect 1: ดึงโซนทั้งหมด
   useEffect(() => {
     async function fetchZones() {
       try {
@@ -29,7 +32,6 @@ export default function DashboardPage() {
           .from('zones')
           .select('*')
           .order('created_at', { ascending: false })
-        
         if (error) throw error
         setZones(data || [])
       } catch (err: any) {
@@ -42,13 +44,12 @@ export default function DashboardPage() {
     fetchZones()
   }, [])
 
-  // ✅ ดึงงานเมื่อเลือกโซน (แก้ไข Null Safety)
+  // ✅ useEffect 2: ดึงงานเมื่อเลือกโซน
   useEffect(() => {
     if (!selectedZone) {
       setTasks([])
       return
     }
-    
     async function fetchTasks() {
       setLoading(true)
       const { data, error } = await supabase
@@ -56,12 +57,41 @@ export default function DashboardPage() {
         .select('*')
         .eq('zone_id', selectedZone!.id)
         .order('due_date', { ascending: true })
-      
       if (error) console.error('Error fetching tasks:', error)
       else setTasks(data || [])
       setLoading(false)
     }
     fetchTasks()
+  }, [selectedZone])
+
+  // ✅ useEffect 3: ดึง deviceId ของปั๊มเมื่อเลือกโซน
+  useEffect(() => {
+    if (!selectedZone) {
+      setPumpDeviceId(null)
+      setPumpLoading(false)
+      return
+    }
+    setPumpDeviceId(null)
+    setPumpLoading(true)
+
+    async function findPumpForZone() {
+      try {
+        const { data } = await supabase
+          .from('devices')
+          .select('device_id')
+          .eq('zone_id', selectedZone.id)
+          .eq('device_type', 'pump')
+          .limit(1)
+          .maybeSingle()
+        setPumpDeviceId(data?.device_id || null)
+      } catch (err) {
+        console.error('Error fetching pump:', err)
+        setPumpDeviceId(null)
+      } finally {
+        setPumpLoading(false)
+      }
+    }
+    findPumpForZone()
   }, [selectedZone])
 
   // ✅ แสดงหน้าโหลด
@@ -97,16 +127,13 @@ export default function DashboardPage() {
   // ✅ หน้าหลัก (Dashboard)
   return (
     <div className="flex h-screen bg-slate-50">
-      {/* Sidebar: รายการโซน */}
       <Sidebar 
         zones={zones} 
         selectedId={selectedZone?.id} 
         onSelect={setSelectedZone} 
       />
       
-      {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-6">
-        {/* Header */}
         <header className="mb-6">
           <h1 className="text-2xl font-bold text-slate-800">📊 แดชบอร์ดจัดการฟาร์ม</h1>
           <p className="text-slate-500">เลือกโซนเพื่อดูตารางการดูแลและบันทึกผล</p>
@@ -114,37 +141,18 @@ export default function DashboardPage() {
 
         {/* 📈 Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <StatCard 
-            title="โซนทั้งหมด" 
-            value={zones.length} 
-            color="bg-emerald-50 text-emerald-700" 
-          />
-          <StatCard 
-            title="งานคั่งค้าง" 
-            value={tasks.filter(t => t.status === 'pending').length} 
-            color="bg-amber-50 text-amber-700" 
-          />
-          <StatCard 
-            title="เสร็จสิ้นแล้ว" 
-            value={tasks.filter(t => t.status === 'completed').length} 
-            color="bg-green-50 text-green-700" 
-          />
-          <StatCard 
-            title="พื้นที่รวม" 
-            value={`${zones.reduce((sum, z) => sum + (z.area_sqm || 0), 0).toLocaleString()} ตร.ม.`} 
-            color="bg-blue-50 text-blue-700" 
-          />
+          <StatCard title="โซนทั้งหมด" value={zones.length} color="bg-emerald-50 text-emerald-700" />
+          <StatCard title="งานคั่งค้าง" value={tasks.filter(t => t.status === 'pending').length} color="bg-amber-50 text-amber-700" />
+          <StatCard title="เสร็จสิ้นแล้ว" value={tasks.filter(t => t.status === 'completed').length} color="bg-green-50 text-green-700" />
+          <StatCard title="พื้นที่รวม" value={`${zones.reduce((sum, z) => sum + (z.area_sqm || 0), 0).toLocaleString()} ตร.ม.`} color="bg-blue-50 text-blue-700" />
         </div>
 
         {/* 🗺️ Main Content Area */}
         {selectedZone ? (
           <div className="bg-white rounded-xl shadow-sm border p-5">
-            {/* Zone Header + Actions */}
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
               <div>
-                <h2 className="text-lg font-semibold text-slate-800">
-                  📍 โซน {selectedZone.name}
-                </h2>
+                <h2 className="text-lg font-semibold text-slate-800">📍 โซน {selectedZone.name}</h2>
                 <p className="text-sm text-slate-500">
                   {selectedZone.crop_type || 'ไม่ระบุพืช'} | 
                   พื้นที่: {selectedZone.area_sqm?.toLocaleString()} ตร.ม. | 
@@ -153,8 +161,6 @@ export default function DashboardPage() {
                   }`}>{selectedZone.status}</span>
                 </p>
               </div>
-              
-              {/* Action Buttons */}
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setShowMap(true)}
@@ -170,16 +176,21 @@ export default function DashboardPage() {
                 </button>
               </div>
             </div>
-               {/* ✅ เพิ่ม SensorCard (ถ้ามี IoT Sensor) */}
-    <SensorCard zoneId={selectedZone.id} />
 
-    {/* ✅ เพิ่ม PumpControl (ถ้ามีอุปกรณ์ปั๊มในโซนนี้) */}
-    <div className="mt-4">
-      <PumpControl 
-        zoneId={selectedZone.id}
-        deviceId={`esp32-pump-${selectedZone.id.slice(0, 8)}`} // หรือเก็บ deviceId ในตาราง zone ${selectedZone.id.slice(0, 8)
-      />
-    </div>
+            {/* 💧 Pump Control Section */}
+            <div className="mt-4">
+              {pumpLoading ? (
+                <div className="p-4 bg-slate-100 rounded-xl text-center text-slate-500 animate-pulse">
+                  🔍 กำลังตรวจสอบอุปกรณ์ในโซน...
+                </div>
+              ) : pumpDeviceId ? (
+                <PumpControl zoneId={selectedZone.id} deviceId={pumpDeviceId} />
+              ) : (
+                <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-center text-slate-500">
+                  💡 ยังไม่ได้ติดตั้งปั๊มในโซนนี้
+                </div>
+              )}
+            </div>
 
             {/* 📋 Task Table */}
             <div className="mt-4">
@@ -201,7 +212,6 @@ export default function DashboardPage() {
             </div>
           </div>
         ) : (
-          /* ✅ Empty State: เมื่อยังไม่ได้เลือกโซน */
           <div className="flex flex-col items-center justify-center h-64 bg-white rounded-xl border-2 border-dashed border-slate-300 text-slate-500">
             <p className="text-lg mb-2">🌱 ยังไม่ได้เลือกโซน</p>
             <p className="text-sm text-center max-w-md">
