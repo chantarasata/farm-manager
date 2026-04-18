@@ -6,7 +6,8 @@ import Sidebar from '@/components/Sidebar'
 import TaskTable from '@/components/TaskTable'
 import AddTaskModal from '@/components/AddTaskModal'
 import ZoneMapModal from '@/components/ZoneMapModal'
-// ✅ ลบ SensorCard ออกชั่วคราว (เพิ่มกลับเมื่อพร้อมทำ IoT)
+import PumpControl from '@/components/PumpControl'
+import SensorCard from '@/components/SensorCard'
 import type { Zone, Task } from '@/types'
 
 export default function DashboardPage() {
@@ -169,6 +170,16 @@ export default function DashboardPage() {
                 </button>
               </div>
             </div>
+               {/* ✅ เพิ่ม SensorCard (ถ้ามี IoT Sensor) */}
+    <SensorCard zoneId={selectedZone.id} />
+
+    {/* ✅ เพิ่ม PumpControl (ถ้ามีอุปกรณ์ปั๊มในโซนนี้) */}
+    <div className="mt-4">
+      <PumpControl 
+        zoneId={selectedZone.id}
+        deviceId={`esp32-pump-0`} // หรือเก็บ deviceId ในตาราง zone ${selectedZone.id.slice(0, 8)
+      />
+    </div>
 
             {/* 📋 Task Table */}
             <div className="mt-4">
