@@ -177,7 +177,7 @@ export default function DashboardPage() {
     <div className="mt-4">
       <PumpControl 
         zoneId={selectedZone.id}
-        deviceId={`esp32-pump-0`} // หรือเก็บ deviceId ในตาราง zone ${selectedZone.id.slice(0, 8)
+        deviceId={`esp32-pump-${selectedZone.id.slice(0, 8)}`} // หรือเก็บ deviceId ในตาราง zone ${selectedZone.id.slice(0, 8)
       />
     </div>
 
