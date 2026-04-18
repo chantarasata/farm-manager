@@ -65,34 +65,38 @@ export default function DashboardPage() {
   }, [selectedZone])
 
   // ✅ useEffect 3: ดึง deviceId ของปั๊มเมื่อเลือกโซน
-  useEffect(() => {
-    if (!selectedZone) {
-      setPumpDeviceId(null)
-      setPumpLoading(false)
-      return
-    }
+// ✅ useEffect 3: ดึง deviceId ของปั๊มเมื่อเลือกโซน
+useEffect(() => {
+  // ✅ Guard clause: ถ้าไม่มี selectedZone ให้หยุดทันที
+  if (!selectedZone) {
     setPumpDeviceId(null)
-    setPumpLoading(true)
+    setPumpLoading(false)
+    return
+  }
+  
+  setPumpDeviceId(null)
+  setPumpLoading(true)
 
-    async function findPumpForZone() {
-      try {
-        const { data } = await supabase
-          .from('devices')
-          .select('device_id')
-          .eq('zone_id', selectedZone.id)
-          .eq('device_type', 'pump')
-          .limit(1)
-          .maybeSingle()
-        setPumpDeviceId(data?.device_id || null)
-      } catch (err) {
-        console.error('Error fetching pump:', err)
-        setPumpDeviceId(null)
-      } finally {
-        setPumpLoading(false)
-      }
+  async function findPumpForZone() {
+    try {
+      const { data } = await supabase
+        .from('devices')
+        .select('device_id')
+        // ✅ ใช้ selectedZone!.id เพราะเรารู้แล้วว่าไม่ null จาก guard clause ด้านบน
+        .eq('zone_id', selectedZone!.id)
+        .eq('device_type', 'pump')
+        .limit(1)
+        .maybeSingle()
+      setPumpDeviceId(data?.device_id || null)
+    } catch (err) {
+      console.error('Error fetching pump:', err)
+      setPumpDeviceId(null)
+    } finally {
+      setPumpLoading(false)
     }
-    findPumpForZone()
-  }, [selectedZone])
+  }
+  findPumpForZone()
+}, [selectedZone])
 
   // ✅ แสดงหน้าโหลด
   if (loading && zones.length === 0) {
